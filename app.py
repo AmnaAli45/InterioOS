@@ -19,7 +19,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Load environment variables
+# Load environment variables from .env
 load_dotenv()
 
 # Custom CSS for clean, premium styling
@@ -63,45 +63,30 @@ st.markdown("""
 if "interio_os_state" not in st.session_state:
     st.session_state["interio_os_state"] = None
 
-# Sidebar Configuration
+# Sidebar Configuration (Clean - No API keys exposed)
 with st.sidebar:
-    st.markdown("### ⚙️ OpenRouter Settings")
-    st.markdown("API Key `.env` file se automatically load hoti hai.")
-
-    env_openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
-    api_key_input = st.text_input(
-        "OpenRouter API Key",
-        value=env_openrouter_key,
-        type="password",
-        help="OpenRouter API Key (loaded from .env). You can also edit it here."
-    )
-
-    model_options = [
-        "nvidia/nemotron-3.5-lightning:free",
-        "anthropic/claude-3.5-sonnet",
-        "meta-llama/llama-3.3-70b-instruct",
-        "google/gemma-4-31b-it:free"
-    ]
-    selected_model = st.selectbox(
-        "OpenRouter Model",
-        options=model_options,
-        index=0,
-        help="Select which model to run via OpenRouter."
-    )
-
-    st.markdown("---")
-    st.markdown("### 👥 Member 1 Role")
+    st.markdown("### ⚙️ Agent Details")
     st.markdown("""
     **Member 1 — Design Agent**
-    1. User se requirement input lena.
-    2. Prompt bhejna: *"is requirement ke liye design concept do"*.
-    3. Output ko **LangGraph State** mein save karna.
+    - **Role**: Concept Generation & Spatial Planning
+    - **State**: LangGraph `InterioOSState`
+    - **Engine**: OpenRouter AI
+    """)
+
+    st.markdown("---")
+    st.markdown("### 👥 System Flow")
+    st.markdown("""
+    1. **Member 1 (Design Agent)**: Takes client requirement, generates design concept, saves in state.
+    2. **Member 2 (Cost Estimator)**: Uses design concept to calculate costs.
+    3. **Member 3 (BOQ Agent)**: Prepares Bill of Quantities.
+    4. **Member 4 (Vendor Agent)**: Connects suppliers.
+    5. **Member 5 (Coordinator)**: Project timeline & milestones.
     """)
 
 # Main Content Header
 st.markdown('<div class="badge-member">Member 1 — Design Agent</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-title">🛋️ InterioOS AI — Design Concept Generator</div>', unsafe_allow_html=True)
-st.markdown("User requirement enter karein. **LangGraph StateGraph** OpenRouter ko call karega aur response **State** mein save karega.")
+st.markdown("Client requirement enter karein. **LangGraph Design Agent** execute ho kar concept ko **State** mein save karega.")
 
 st.markdown("---")
 
@@ -122,7 +107,7 @@ with col_p3:
     if st.button("🍽️ Modular Kitchen (Rs. 6 Lakh)", use_container_width=True):
         preset_text = "Design a contemporary modular kitchen for an apartment with Rs. 6 lakh budget. Quartz countertop, matte acrylic cabinets, under-cabinet task lighting, and smart pull-out pantry."
 
-# Input Form
+# Input Form (Clean - No API Key input shown)
 with st.form("design_agent_form"):
     st.markdown("##### 📝 Client Requirement Details")
 
@@ -142,34 +127,19 @@ with st.form("design_agent_form"):
     with col_f3:
         style_input = st.text_input("Style (Optional)", value="Modern Contemporary")
 
-    # API Key Input (Defaults to .env)
-    st.markdown("##### 🔑 OpenRouter API Key")
-    key_field = st.text_input(
-        "API Key (automatically loaded from .env) *",
-        value=api_key_input if api_key_input else env_openrouter_key,
-        type="password",
-        placeholder="sk-or-v1-...",
-        help="Your OpenRouter key is loaded from .env or you can enter it here."
-    )
-
-    submit_button = st.form_submit_button("🚀 Generate Design Concept (LangGraph + OpenRouter)")
+    submit_button = st.form_submit_button("🚀 Generate Design Concept (LangGraph)")
 
 # Execution Logic
 if submit_button:
-    effective_key = key_field.strip() or api_key_input.strip() or env_openrouter_key.strip()
     if not user_req.strip():
         st.error("Please enter a valid user requirement.")
-    elif not effective_key:
-        st.warning("⚠️ Please enter your OpenRouter API key in the box above or in .env file.")
     else:
-        with st.spinner("🤖 Design Agent is generating concept via OpenRouter & saving into LangGraph State..."):
+        with st.spinner("🤖 Design Agent is generating concept & saving into LangGraph State..."):
             result_state: InterioOSState = generate_design_concept(
                 requirement=user_req.strip(),
                 budget=budget_input.strip() if budget_input else None,
                 room_type=room_type_input.strip() if room_type_input else None,
-                style=style_input.strip() if style_input else None,
-                model=selected_model,
-                api_key=effective_key
+                style=style_input.strip() if style_input else None
             )
 
             st.session_state["interio_os_state"] = result_state
