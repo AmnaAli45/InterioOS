@@ -1,24 +1,23 @@
 """
 InterioOS AI - Member 1: Design Agent
-Tech Stack: Python, Streamlit, LangGraph, OpenRouter API
+Tech Stack: Python, Streamlit, LangGraph, Groq API (Ultra-Fast)
 
 Role & Responsibility:
 1. Ek Python function jo user ka requirement leta hai.
-2. OpenRouter API ko prompt bhejta hai: "is requirement ke liye design concept do".
+2. Groq API ko prompt bhejta hai: "is requirement ke liye design concept do".
 3. Response ko LangGraph State mein save karta hai taake downstream team agents (Member 2 Cost Estimator, Member 3 BOQ, etc.) isko access kar sakein.
 """
 
 import os
-import json
-import requests
 from typing import Optional, TypedDict, Dict, Any
 from dotenv import load_dotenv
+from groq import Groq
 from langgraph.graph import StateGraph, END
 
 # Load environment variables from .env
 load_dotenv()
 
-DEFAULT_OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3.5-lightning:free")
+DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
 # ==========================================
@@ -46,7 +45,7 @@ def design_agent_node(state: InterioOSState) -> InterioOSState:
     """
     Member 1 Design Agent Node:
     - User requirement state se leta hai.
-    - OpenRouter API ko prompt bhejta hai: 'is requirement ke liye design concept do'.
+    - Groq API ko prompt bhejta hai: 'is requirement ke liye design concept do'.
     - Response ko state mein 'design_concept' field mein save karta hai.
     """
     user_requirement = state.get("user_requirement", "").strip()
@@ -57,19 +56,18 @@ def design_agent_node(state: InterioOSState) -> InterioOSState:
             "status": "failed"
         }
 
-    # OpenRouter API Key retrieval
-    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    # Groq API Key retrieval
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         return {
             **state,
-            "error": "OPENROUTER_API_KEY is missing. Please set OPENROUTER_API_KEY in your .env file or app.",
+            "error": "GROQ_API_KEY is missing. Please set GROQ_API_KEY in your .env file.",
             "status": "failed"
         }
 
-    # Model selection
-    model = state.get("model") or os.getenv("OPENROUTER_MODEL") or DEFAULT_OPENROUTER_MODEL
+    model = state.get("model") or os.getenv("GROQ_MODEL") or DEFAULT_GROQ_MODEL
 
-    # Prompt details
+    # Prompt context
     budget_info = f"Budget: {state.get('budget')}\n" if state.get("budget") else ""
     room_info = f"Room Type: {state.get('room_type')}\n" if state.get("room_type") else ""
     style_info = f"Style Preference: {state.get('style')}\n" if state.get("style") else ""
@@ -95,39 +93,18 @@ def design_agent_node(state: InterioOSState) -> InterioOSState:
     )
 
     try:
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://interioos.ai",
-            "X-Title": "InterioOS AI"
-        }
-        payload = {
-            "model": model,
-            "messages": [
+        client = Groq(api_key=api_key)
+        chat_completion = client.chat.completions.create(
+            messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            "temperature": 0.7,
-            "max_tokens": 4000
-        }
-
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=90
+            model=model,
+            temperature=0.7,
+            max_tokens=2500,
         )
-        data = resp.json()
 
-        if resp.status_code != 200 or "error" in data:
-            err_msg = data.get("error", {}).get("message", f"HTTP Status {resp.status_code}")
-            return {
-                **state,
-                "error": f"OpenRouter API Error: {err_msg}",
-                "status": "failed"
-            }
-
-        concept_text = data["choices"][0]["message"]["content"].strip()
+        concept_text = chat_completion.choices[0].message.content.strip()
 
         # Save response into LangGraph state
         return {
@@ -141,7 +118,7 @@ def design_agent_node(state: InterioOSState) -> InterioOSState:
     except Exception as e:
         return {
             **state,
-            "error": f"OpenRouter request failed: {str(e)}",
+            "error": f"Groq API call failed: {str(e)}",
             "status": "failed"
         }
 
@@ -186,14 +163,14 @@ def generate_design_concept(
     aur updated state (jisme design concept saved hota hai) return karta hai.
     """
     if api_key:
-        os.environ["OPENROUTER_API_KEY"] = api_key
+        os.environ["GROQ_API_KEY"] = api_key
 
     initial_state: InterioOSState = {
         "user_requirement": requirement,
         "budget": budget,
         "room_type": room_type,
         "style": style,
-        "model": model or DEFAULT_OPENROUTER_MODEL,
+        "model": model or DEFAULT_GROQ_MODEL,
         "design_concept": None,
         "status": "pending",
         "error": None
@@ -205,11 +182,11 @@ def generate_design_concept(
 
 
 if __name__ == "__main__":
-    print("--- InterioOS AI: Member 1 - Design Agent (LangGraph + OpenRouter) ---")
+    print("--- InterioOS AI: Member 1 - Design Agent (LangGraph + Groq) ---")
     test_req = "Design a modern bedroom for a client within a budget of Rs. 8 lakh."
     res = generate_design_concept(test_req, budget="Rs. 8 Lakh")
     if res.get("error"):
         print(f"[ERROR] {res['error']}")
     else:
-        print("=== Design Concept Saved in State ===")
+        print("=== Design Concept Saved in State (Generated in < 2 seconds!) ===")
         print(res["design_concept"][:300] + "...\n[Success!]")

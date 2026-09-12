@@ -1,6 +1,6 @@
 """
 InterioOS AI - Design Agent
-Tech Stack: Python, Streamlit, LangGraph, OpenRouter API
+Tech Stack: Python, Streamlit, LangGraph, Groq API
 """
 
 import os
@@ -17,7 +17,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Load environment variables
+# Load environment variables from .env
 load_dotenv()
 
 # Custom CSS for clean, premium styling
@@ -62,9 +62,9 @@ if "interio_os_state" not in st.session_state:
     st.session_state["interio_os_state"] = None
 
 # Main Content Header
-st.markdown('<div class="badge-member">Design Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="badge-member">Member 1 — Design Agent</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-title">🛋️ Interior Design Concept Generator</div>', unsafe_allow_html=True)
-st.markdown("Apni design requirement enter karein aur AI design concept generate karein.")
+st.markdown("Client requirement enter karein aur ultra-fast AI design concept generate karein.")
 
 st.markdown("---")
 
@@ -105,14 +105,14 @@ with st.form("design_agent_form"):
     with col_f3:
         style_input = st.text_input("Style (Optional)", value="Modern Contemporary")
 
-    submit_button = st.form_submit_button("🚀 Generate Design Concept")
+    submit_button = st.form_submit_button("🚀 Generate Design Concept (Ultra-Fast Groq)")
 
 # Execution Logic
 if submit_button:
     if not user_req.strip():
         st.error("Please enter a valid user requirement.")
     else:
-        with st.spinner("🤖 Generating interior design concept..."):
+        with st.spinner("⚡ Generating concept in seconds via Groq..."):
             result_state: InterioOSState = generate_design_concept(
                 requirement=user_req.strip(),
                 budget=budget_input.strip() if budget_input else None,
@@ -125,7 +125,7 @@ if submit_button:
             if result_state.get("error"):
                 st.error(f"❌ Error: {result_state['error']}")
             else:
-                st.success("✅ Design concept generated successfully!")
+                st.success("✅ Design concept generated & successfully saved in LangGraph State!")
 
 # Display Clean Results (Direct Concept Only)
 saved_state = st.session_state.get("interio_os_state")
