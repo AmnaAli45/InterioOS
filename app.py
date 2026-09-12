@@ -1,6 +1,6 @@
 """
 InterioOS AI - Member 1: Design Agent Streamlit Application
-Tech Stack: Python, Streamlit, LangGraph, Groq / Claude API
+Tech Stack: Python, Streamlit, LangGraph, OpenRouter / Groq / Claude API
 """
 
 import os
@@ -9,7 +9,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 # Import the Design Agent LangGraph module
-from design_agent import generate_design_concept, InterioOSState
+from design_agent import generate_design_concept, InterioOSState, detect_provider
 
 # Page configuration
 st.set_page_config(
@@ -65,55 +65,58 @@ if "interio_os_state" not in st.session_state:
 
 # Sidebar Configuration
 with st.sidebar:
-    st.markdown("### ⚙️ LLM & Agent Settings")
+    st.markdown("### ⚙️ AI Provider & API Key")
 
     provider_choice = st.radio(
-        "Select AI Provider",
-        options=["Groq (Fast & Free)", "Anthropic Claude"],
+        "Select Provider",
+        options=["OpenRouter (Auto-Detect / sk-or-)", "Groq (Fast / gsk_)", "Anthropic Claude (sk-ant-)"],
         index=0,
-        help="Choose Groq for fast free generation or Claude."
+        help="Paste any key below; system automatically detects OpenRouter, Groq, or Claude!"
     )
-    provider_key = "groq" if "Groq" in provider_choice else "claude"
 
-    if provider_key == "groq":
-        env_groq_key = os.getenv("GROQ_API_KEY", "")
-        api_key_input = st.text_input(
-            "Groq API Key *",
-            value=env_groq_key,
-            type="password",
-            help="Enter your Groq key (from https://console.groq.com/keys) or save in .env"
-        )
-        model_choice = st.selectbox(
-            "Groq Model",
-            options=[
-                "llama-3.3-70b-versatile",
-                "llama-3.1-8b-instant",
-                "mixtral-8x7b-32768",
-                "gemma2-9b-it"
-            ],
-            index=0
-        )
-        if model_choice:
-            os.environ["GROQ_MODEL"] = model_choice
+    if "OpenRouter" in provider_choice:
+        provider_key = "openrouter"
+        env_key = os.getenv("OPENROUTER_API_KEY", "")
+        key_label = "OpenRouter API Key (sk-or-v1-...)"
+        model_options = [
+            "nvidia/nemotron-3.5-lightning:free",
+            "anthropic/claude-3.5-sonnet",
+            "meta-llama/llama-3.3-70b-instruct",
+            "google/gemma-4-31b-it:free"
+        ]
+    elif "Groq" in provider_choice:
+        provider_key = "groq"
+        env_key = os.getenv("GROQ_API_KEY", "")
+        key_label = "Groq API Key (gsk_...)"
+        model_options = [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "mixtral-8x7b-32768"
+        ]
     else:
-        env_claude_key = os.getenv("ANTHROPIC_API_KEY", "")
-        api_key_input = st.text_input(
-            "Anthropic API Key *",
-            value=env_claude_key,
-            type="password",
-            help="Enter your Anthropic API Key or save in .env"
-        )
-        model_choice = st.selectbox(
-            "Claude Model",
-            options=[
-                "claude-3-5-sonnet-20241022",
-                "claude-3-5-haiku-20241022",
-                "claude-3-haiku-20240307"
-            ],
-            index=0
-        )
-        if model_choice:
-            os.environ["ANTHROPIC_MODEL"] = model_choice
+        provider_key = "claude"
+        env_key = os.getenv("ANTHROPIC_API_KEY", "")
+        key_label = "Anthropic API Key (sk-ant-...)"
+        model_options = [
+            "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku-20241022"
+        ]
+
+    api_key_input = st.text_input(
+        key_label,
+        value=env_key,
+        type="password",
+        help="Paste your API key here."
+    )
+
+    model_choice = st.selectbox("Model", options=model_options, index=0)
+
+    # Auto-detection feedback
+    if api_key_input.strip():
+        detected = detect_provider(api_key_input.strip())
+        if detected != provider_key:
+            st.info(f"💡 Key auto-detected as **{detected.upper()}**.")
+            provider_key = detected
 
     st.markdown("---")
     st.markdown("### 👥 Member 1 Role")
@@ -168,22 +171,23 @@ with st.form("design_agent_form"):
     with col_f3:
         style_input = st.text_input("Style (Optional)", value="Modern Contemporary")
 
-    submit_button = st.form_submit_button(f"🚀 Generate Design Concept ({provider_key.upper()} + LangGraph)")
+    submit_button = st.form_submit_button(f"🚀 Generate Design Concept (LangGraph + {provider_key.upper()})")
 
 # Execution Logic
 if submit_button:
     if not user_req.strip():
         st.error("Please enter a valid user requirement.")
     elif not api_key_input.strip():
-        st.warning(f"⚠️ {provider_key.upper()} API Key missing! Sidebar mein apni key paste karein ya .env file mein add karein.")
+        st.warning(f"⚠️ Please enter your API key in the sidebar.")
     else:
-        with st.spinner(f"🤖 Design Agent is calling {provider_key.capitalize()} API & saving into LangGraph State..."):
+        with st.spinner(f"🤖 Design Agent is generating concept via {provider_key.upper()} & saving into LangGraph State..."):
             result_state: InterioOSState = generate_design_concept(
                 requirement=user_req.strip(),
                 budget=budget_input.strip() if budget_input else None,
                 room_type=room_type_input.strip() if room_type_input else None,
                 style=style_input.strip() if style_input else None,
                 provider=provider_key,
+                model=model_choice,
                 api_key=api_key_input.strip()
             )
 
@@ -192,7 +196,7 @@ if submit_button:
             if result_state.get("error"):
                 st.error(f"❌ Error: {result_state['error']}")
             else:
-                st.success("✅ Design concept generated & successfully saved in LangGraph State!")
+                st.success(f"✅ Design concept generated & successfully saved in LangGraph State via {result_state.get('provider', '').upper()}!")
 
 # Display Results if Available
 saved_state = st.session_state.get("interio_os_state")
