@@ -1,10 +1,9 @@
 """
-InterioOS AI - Member 1: Design Agent Streamlit Application
+InterioOS AI - Design Agent
 Tech Stack: Python, Streamlit, LangGraph, OpenRouter API
 """
 
 import os
-import json
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -15,11 +14,10 @@ from design_agent import generate_design_concept, InterioOSState
 st.set_page_config(
     page_title="InterioOS AI - Design Agent",
     page_icon="🛋️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Load environment variables from .env
+# Load environment variables
 load_dotenv()
 
 # Custom CSS for clean, premium styling
@@ -63,35 +61,15 @@ st.markdown("""
 if "interio_os_state" not in st.session_state:
     st.session_state["interio_os_state"] = None
 
-# Sidebar Configuration (Clean - No API keys exposed)
-with st.sidebar:
-    st.markdown("### ⚙️ Agent Details")
-    st.markdown("""
-    **Member 1 — Design Agent**
-    - **Role**: Concept Generation & Spatial Planning
-    - **State**: LangGraph `InterioOSState`
-    - **Engine**: OpenRouter AI
-    """)
-
-    st.markdown("---")
-    st.markdown("### 👥 System Flow")
-    st.markdown("""
-    1. **Member 1 (Design Agent)**: Takes client requirement, generates design concept, saves in state.
-    2. **Member 2 (Cost Estimator)**: Uses design concept to calculate costs.
-    3. **Member 3 (BOQ Agent)**: Prepares Bill of Quantities.
-    4. **Member 4 (Vendor Agent)**: Connects suppliers.
-    5. **Member 5 (Coordinator)**: Project timeline & milestones.
-    """)
-
 # Main Content Header
-st.markdown('<div class="badge-member">Member 1 — Design Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="main-title">🛋️ InterioOS AI — Design Concept Generator</div>', unsafe_allow_html=True)
-st.markdown("Client requirement enter karein. **LangGraph Design Agent** execute ho kar concept ko **State** mein save karega.")
+st.markdown('<div class="badge-member">Design Agent</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">🛋️ Interior Design Concept Generator</div>', unsafe_allow_html=True)
+st.markdown("Apni design requirement enter karein aur AI design concept generate karein.")
 
 st.markdown("---")
 
 # Quick Preset Buttons
-st.markdown("##### ⚡ Quick Requirement Presets")
+st.markdown("##### ⚡ Quick Presets")
 col_p1, col_p2, col_p3 = st.columns(3)
 
 preset_text = ""
@@ -107,15 +85,15 @@ with col_p3:
     if st.button("🍽️ Modular Kitchen (Rs. 6 Lakh)", use_container_width=True):
         preset_text = "Design a contemporary modular kitchen for an apartment with Rs. 6 lakh budget. Quartz countertop, matte acrylic cabinets, under-cabinet task lighting, and smart pull-out pantry."
 
-# Input Form (Clean - No API Key input shown)
+# Input Form
 with st.form("design_agent_form"):
     st.markdown("##### 📝 Client Requirement Details")
 
     default_req = preset_text if preset_text else "Design a modern bedroom for a client within a budget of Rs. 8 lakh."
     user_req = st.text_area(
-        "Design Requirement Prompt *",
+        "Design Requirement *",
         value=default_req,
-        height=110,
+        height=120,
         help="Client requirements, room type, style, budget, or constraints."
     )
 
@@ -127,14 +105,14 @@ with st.form("design_agent_form"):
     with col_f3:
         style_input = st.text_input("Style (Optional)", value="Modern Contemporary")
 
-    submit_button = st.form_submit_button("🚀 Generate Design Concept (LangGraph)")
+    submit_button = st.form_submit_button("🚀 Generate Design Concept")
 
 # Execution Logic
 if submit_button:
     if not user_req.strip():
         st.error("Please enter a valid user requirement.")
     else:
-        with st.spinner("🤖 Design Agent is generating concept & saving into LangGraph State..."):
+        with st.spinner("🤖 Generating interior design concept..."):
             result_state: InterioOSState = generate_design_concept(
                 requirement=user_req.strip(),
                 budget=budget_input.strip() if budget_input else None,
@@ -147,46 +125,18 @@ if submit_button:
             if result_state.get("error"):
                 st.error(f"❌ Error: {result_state['error']}")
             else:
-                st.success("✅ Design concept generated & successfully saved in LangGraph State!")
+                st.success("✅ Design concept generated successfully!")
 
-# Display Results if Available
+# Display Clean Results (Direct Concept Only)
 saved_state = st.session_state.get("interio_os_state")
 if saved_state and saved_state.get("design_concept"):
     st.markdown("---")
-    st.markdown("### 📊 Agent Results & Saved State")
+    st.markdown("### 📋 Generated Design Concept")
 
-    tab_concept, tab_state, tab_team = st.tabs([
-        "📄 Generated Design Concept",
-        "🧠 LangGraph State Inspector",
-        "🤝 Downstream Multi-Agent Hand-off"
-    ])
-
-    with tab_concept:
-        st.markdown(saved_state["design_concept"])
-        st.download_button(
-            label="📥 Download Design Concept (.md)",
-            data=saved_state["design_concept"],
-            file_name="interioos_design_concept.md",
-            mime="text/markdown"
-        )
-
-    with tab_state:
-        st.markdown("**Current LangGraph State (`InterioOSState`):**")
-        st.caption("Yeh state LangGraph ke mutabiq save hui hai aur baaqi team members ke agents ke liye ready hai.")
-        st.json(saved_state)
-
-    with tab_team:
-        st.markdown("""
-        #### 🔄 How Team Members Use This State:
-        Member 1 has populated `state["design_concept"]`. Other team members' agents can now take over:
-
-        1. **Member 2 (Cost & Material Estimator)**:
-           - Reads `state["design_concept"]`
-           - Calculates material quantities & costs within budget.
-        2. **Member 3 (BOQ Agent)**:
-           - Generates itemized Bill of Quantities.
-        3. **Member 4 (Vendor Agent)**:
-           - Recommends suppliers & materials.
-        4. **Member 5 (Coordinator / PM Agent)**:
-           - Consolidates project timeline & reports.
-        """)
+    st.markdown(saved_state["design_concept"])
+    st.download_button(
+        label="📥 Download Concept (.md)",
+        data=saved_state["design_concept"],
+        file_name="interior_design_concept.md",
+        mime="text/markdown"
+    )
