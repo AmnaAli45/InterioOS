@@ -1,234 +1,203 @@
 """
-Design Agent Module for InterioOS AI.
+InterioOS AI - Member 1: Design Agent
+Tech Stack: Python, LangGraph, Anthropic Claude API
 
-This module forms the Design Agent component of the InterioOS AI multi-agent interior design system.
-It takes client design requirements and communicates with the Claude API (Anthropic) to produce
-structured, professional interior design concepts.
-
-Author: InterioOS AI Team (Member 1 - Design Agent)
+Role & Responsibility:
+1. Ek Python function jo user ka requirement leta hai.
+2. Claude API ko prompt bhejta hai: "is requirement ke liye design concept do".
+3. Response ko LangGraph State mein save karta hai taake downstream agents (Cost Estimator, BOQ, Vendor, etc.) isko access kar sakein.
 """
 
-import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Optional, TypedDict, Dict, Any
 from dotenv import load_dotenv
 import anthropic
+from langgraph.graph import StateGraph, END
 
-# Configure module logger
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-# Automatically load environment variables from .env if available
+# Load environment variables
 load_dotenv()
 
-DEFAULT_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
 
-
-class DesignAgent:
+# ==========================================
+# 1. LANGGRAPH STATE DEFINITION
+# ==========================================
+class InterioOSState(TypedDict, total=False):
     """
-    DesignAgent encapsulates state and logic for generating interior design concepts via Claude API.
-
-    Attributes:
-        api_key (Optional[str]): Anthropic API key used for authentication.
-        model (str): Model name for the Claude API request.
-        latest_concept (Optional[str]): The most recently generated interior design concept text.
-        last_requirement (Optional[str]): The requirement prompt passed during the last generation.
+    Multi-Agent Shared State Schema for InterioOS.
+    Member 1 (Design Agent) inputs 'user_requirement' and populates 'design_concept'.
     """
+    user_requirement: str        # Client requirement input
+    budget: Optional[str]        # Optional budget information
+    room_type: Optional[str]     # Optional room type
+    style: Optional[str]         # Optional style preference
+    design_concept: Optional[str]# Claude API se generate hone wala design concept (Saved here)
+    status: Optional[str]        # Workflow status (e.g. 'concept_generated', 'error')
+    error: Optional[str]         # Error message if any
 
-    def __init__(self, api_key: Optional[str] = None, model: str = DEFAULT_MODEL) -> None:
-        """
-        Initialize the DesignAgent with optional API key and model selection.
 
-        Args:
-            api_key: Optional API key. If not provided, resolves from ANTHROPIC_API_KEY env var.
-            model: Anthropic model identifier. Defaults to ANTHROPIC_MODEL env var or claude-3-5-sonnet-20241022.
-        """
-        self.api_key: Optional[str] = api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.model: str = model
-        self.latest_concept: Optional[str] = None
-        self.last_requirement: Optional[str] = None
-        self._client: Optional[anthropic.Anthropic] = None
-
-        if self.api_key:
-            self._client = anthropic.Anthropic(api_key=self.api_key)
-        else:
-            logger.warning(
-                "ANTHROPIC_API_KEY environment variable is not set. "
-                "API calls will require explicit key initialization or set env variable."
-            )
-
-    def _get_client(self) -> anthropic.Anthropic:
-        """
-        Retrieve or initialize the Anthropic client, checking for API key presence.
-
-        Returns:
-            anthropic.Anthropic: Configured client instance.
-
-        Raises:
-            ValueError: If ANTHROPIC_API_KEY is not set or accessible.
-        """
-        if self._client:
-            return self._client
-
-        api_key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "ANTHROPIC_API_KEY missing. Please set ANTHROPIC_API_KEY in your environment or .env file."
-            )
-
-        self.api_key = api_key
-        self._client = anthropic.Anthropic(api_key=api_key)
-        return self._client
-
-    def _construct_prompt(self, requirement: str) -> tuple[str, str]:
-        """
-        Construct system and user messages tailored for an interior design expert.
-
-        Args:
-            requirement: Raw client requirement text.
-
-        Returns:
-            Tuple containing (system_prompt, user_prompt).
-        """
-        system_prompt = (
-            "You are an expert Lead Interior Designer for InterioOS AI, a multi-agent interior design platform. "
-            "Your objective is to craft comprehensive, inspirational, and architecturally sound interior design concepts "
-            "tailored to client requirements.\n\n"
-            "Structure your output cleanly using clear Markdown formatting with the following sections:\n"
-            "1. **Concept Summary & Visual Theme**: Architectural style, mood, aesthetic direction.\n"
-            "2. **Color Palette & Material Specification**: Walls, floors, accents, textures, fabrics.\n"
-            "3. **Spatial Layout & Functionality**: Zoning, traffic flow, ergonomics, furniture arrangement.\n"
-            "4. **Lighting Strategy**: Natural lighting optimization, ambient, task, and accent fixtures.\n"
-            "5. **Key Furniture & Statement Pieces**: Custom built-ins, loose furniture, accent items.\n"
-            "6. **Decor & Styling Details**: Art, greenery, drapery, hardware finishes.\n"
-            "7. **Practical & Technical Notes**: Sustainability, acoustics, storage solutions, durability.\n"
-        )
-
-        user_prompt = (
-            f"Client Design Requirement:\n"
-            f"\"\"\"\n{requirement.strip()}\n\"\"\"\n\n"
-            "Please generate a complete, highly detailed interior design concept based on the requirements above."
-        )
-
-        return system_prompt, user_prompt
-
-    def generate_design_concept(self, requirement: str) -> str:
-        """
-        Generate an interior design concept based on user requirements.
-
-        Args:
-            requirement: User input specifying interior design needs, preferences, and constraints.
-
-        Returns:
-            str: Generated design concept output from Claude.
-
-        Raises:
-            ValueError: If input requirement is blank or API key is missing.
-            RuntimeError: If API communication fails or error occurs during processing.
-        """
-        if not requirement or not requirement.strip():
-            raise ValueError("Requirement string cannot be empty or whitespace.")
-
-        client = self._get_client()
-        system_prompt, user_prompt = self._construct_prompt(requirement)
-
-        logger.info("Initiating request to Claude API for design concept generation...")
-
-        try:
-            response = client.messages.create(
-                model=self.model,
-                max_tokens=4000,
-                temperature=0.7,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-
-            # Extract response text content blocks
-            concept_parts = []
-            for block in response.content:
-                if block.type == "text":
-                    concept_parts.append(block.text)
-
-            generated_concept = "".join(concept_parts).strip()
-
-            # Save in internal agent state for downstream inter-agent access
-            self.last_requirement = requirement
-            self.latest_concept = generated_concept
-
-            logger.info("Successfully received and stored design concept from Claude API.")
-            return generated_concept
-
-        except anthropic.APIConnectionError as e:
-            logger.error(f"Failed to connect to Anthropic API: {e}")
-            raise RuntimeError(f"Connection error to Claude API: {e}") from e
-        except anthropic.APIStatusError as e:
-            logger.error(f"Anthropic API returned error status [{e.status_code}]: {e.response}")
-            raise RuntimeError(f"Claude API HTTP Error {e.status_code}: {e.message}") from e
-        except anthropic.APIError as e:
-            logger.error(f"Anthropic API error: {e}")
-            raise RuntimeError(f"Claude API error: {e}") from e
-        except Exception as e:
-            logger.error(f"Unexpected error generating design concept: {e}")
-            raise RuntimeError(f"An unexpected error occurred: {e}") from e
-
-    def get_state(self) -> Dict[str, Any]:
-        """
-        Retrieve current agent state dictionary for integration with other InterioOS AI agents.
-
-        Returns:
-            Dict containing requirement, latest_concept, and model info.
-        """
+# ==========================================
+# 2. DESIGN AGENT FUNCTION (LANGGRAPH NODE)
+# ==========================================
+def design_agent_node(state: InterioOSState) -> InterioOSState:
+    """
+    Member 1 Design Agent Node:
+    - User requirement state se leta hai.
+    - Claude API ko prompt bhejta hai: 'is requirement ke liye design concept do'.
+    - Response ko state mein 'design_concept' field mein save karta hai.
+    """
+    user_requirement = state.get("user_requirement", "").strip()
+    if not user_requirement:
         return {
-            "last_requirement": self.last_requirement,
-            "latest_concept": self.latest_concept,
-            "model": self.model,
-            "is_ready": self.latest_concept is not None,
+            **state,
+            "error": "User requirement cannot be empty.",
+            "status": "failed"
+        }
+
+    # API Key retrieval
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {
+            **state,
+            "error": "ANTHROPIC_API_KEY is not configured in .env or environment.",
+            "status": "failed"
+        }
+
+    # Claude API Client
+    client = anthropic.Anthropic(api_key=api_key)
+    model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+
+    # Prompt: Claude ko interior design concept tayyar karne ka instruction
+    budget_info = f"Budget: {state.get('budget')}\n" if state.get("budget") else ""
+    room_info = f"Room Type: {state.get('room_type')}\n" if state.get("room_type") else ""
+    style_info = f"Style Preference: {state.get('style')}\n" if state.get("style") else ""
+
+    system_prompt = (
+        "You are an expert Lead Interior Designer for InterioOS AI, a multi-agent interior design system.\n"
+        "Your task is to take the client requirement and generate a comprehensive, highly practical, and aesthetic interior design concept.\n\n"
+        "Please format the design concept clearly in Markdown with the following sections:\n"
+        "1. **Concept Summary & Visual Theme**: Design style, ambiance, and mood.\n"
+        "2. **Spatial Layout & Zoning**: Space optimization, furniture layout, and functionality.\n"
+        "3. **Color Palette & Material Direction**: Primary, secondary, and accent colors, textures, wall & flooring finishes.\n"
+        "4. **Lighting Strategy**: Ambient, task, and accent lighting ideas.\n"
+        "5. **Key Furniture & Decor Elements**: Essential items, statement pieces, fixtures.\n"
+        "6. **Recommendations for Downstream Estimation**: Practical suggestions for material quantification and budgeting."
+    )
+
+    user_prompt = (
+        f"is requirement ke liye design concept do:\n\n"
+        f"Requirement: \"{user_requirement}\"\n"
+        f"{room_info}"
+        f"{style_info}"
+        f"{budget_info}"
+    )
+
+    try:
+        # Claude API call
+        response = client.messages.create(
+            model=model,
+            max_tokens=4000,
+            temperature=0.7,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        # Extract generated response text
+        concept_text = "".join([block.text for block in response.content if block.type == "text"]).strip()
+
+        # Save response in LangGraph state
+        return {
+            **state,
+            "design_concept": concept_text,
+            "status": "concept_generated",
+            "error": None
+        }
+
+    except Exception as e:
+        return {
+            **state,
+            "error": f"Claude API call failed: {str(e)}",
+            "status": "failed"
         }
 
 
-# Module-level singleton agent instance for standard functional access
-_agent_instance: Optional[DesignAgent] = None
-
-
-def generate_design_concept(requirement: str) -> str:
+# ==========================================
+# 3. LANGGRAPH WORKFLOW BUILDER
+# ==========================================
+def build_design_graph():
     """
-    Top-level module function to generate an interior design concept.
+    LangGraph StateGraph build karta hai.
+    Design Agent node add karke graph compile karta hai.
+    """
+    workflow = StateGraph(InterioOSState)
 
-    Convenience wrapper around DesignAgent.generate_design_concept.
-    Maintains persistent agent state in module scope for downstream inter-agent use.
+    # Add Design Agent Node
+    workflow.add_node("design_agent", design_agent_node)
+
+    # Workflow entry point and termination
+    workflow.set_entry_point("design_agent")
+    workflow.add_edge("design_agent", END)
+
+    return workflow.compile()
+
+
+# Compile graph for reuse
+design_graph = build_design_graph()
+
+
+# ==========================================
+# 4. CONVENIENCE FUNCTION
+# ==========================================
+def generate_design_concept(
+    requirement: str,
+    budget: Optional[str] = None,
+    room_type: Optional[str] = None,
+    style: Optional[str] = None,
+    api_key: Optional[str] = None
+) -> InterioOSState:
+    """
+    User ka requirement leta hai, LangGraph graph execute karta hai,
+    aur updated state (jisme design concept saved hota hai) return karta hai.
 
     Args:
-        requirement: The user's interior design requirement description.
+        requirement: User ka design requirement (e.g. 'Design a modern bedroom within Rs. 8 lakh').
+        budget: Optional budget.
+        room_type: Optional room type.
+        style: Optional style preference.
+        api_key: Optional Anthropic API Key (agar pass kiya jaye toh env mein set hota hai).
 
     Returns:
-        str: Generated interior design concept.
+        InterioOSState: Updated state dictionary containing 'design_concept'.
     """
-    global _agent_instance
-    if _agent_instance is None:
-        _agent_instance = DesignAgent()
+    if api_key:
+        os.environ["ANTHROPIC_API_KEY"] = api_key
 
-    return _agent_instance.generate_design_concept(requirement)
+    initial_state: InterioOSState = {
+        "user_requirement": requirement,
+        "budget": budget,
+        "room_type": room_type,
+        "style": style,
+        "design_concept": None,
+        "status": "pending",
+        "error": None
+    }
+
+    # Execute LangGraph workflow
+    final_state: InterioOSState = design_graph.invoke(initial_state)
+    return final_state
 
 
+# CLI Test
 if __name__ == "__main__":
-    import sys
+    print("--- InterioOS AI: Member 1 - Design Agent (LangGraph) ---")
+    test_requirement = "Design a modern bedroom for a client within a budget of Rs. 8 lakh."
+    print(f"Test Requirement: {test_requirement}\n")
 
-    print("InterioOS AI - Design Agent Test Run")
-    test_req = (
-        "Modern Japandi style living room for a 300 sq ft space with high ceilings. "
-        "Needs neutral tones, natural wood accents, warm indirect lighting, and a cozy reading nook."
-    )
-
-    api_key_env = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key_env:
-        print("[WARNING] ANTHROPIC_API_KEY not found in environment or .env file.")
-        print("Please configure ANTHROPIC_API_KEY in .env before executing live API requests.")
-        sys.exit(1)
-
-    try:
-        print(f"\nGenerating design concept for test requirement:\n'{test_req}'\n")
-        concept = generate_design_concept(test_req)
-        print("--- Generated Design Concept ---")
-        print(concept)
-    except Exception as err:
-        print(f"[ERROR] Design concept generation failed: {err}")
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        print("[NOTE] ANTHROPIC_API_KEY not found in .env. Please set it before running live API calls.")
+    else:
+        result_state = generate_design_concept(test_requirement, budget="Rs. 8 Lakh")
+        if result_state.get("error"):
+            print(f"[ERROR] {result_state['error']}")
+        else:
+            print("=== Design Concept Saved in State ===")
+            print(result_state["design_concept"])
