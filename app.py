@@ -1,6 +1,6 @@
 """
 InterioOS AI - Member 1: Design Agent Streamlit Application
-Tech Stack: Python, Streamlit, LangGraph, OpenRouter / Groq / Claude API
+Tech Stack: Python, Streamlit, LangGraph, OpenRouter API
 """
 
 import os
@@ -9,7 +9,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 # Import the Design Agent LangGraph module
-from design_agent import generate_design_concept, InterioOSState, detect_provider
+from design_agent import generate_design_concept, InterioOSState
 
 # Page configuration
 st.set_page_config(
@@ -65,37 +65,29 @@ if "interio_os_state" not in st.session_state:
 
 # Sidebar Configuration
 with st.sidebar:
-    st.markdown("### ⚙️ Settings")
-    provider_choice = st.radio(
-        "AI Provider",
-        options=["OpenRouter (Auto-Detect / sk-or-)", "Groq (Fast / gsk_)", "Anthropic Claude (sk-ant-)"],
-        index=0,
-        help="Paste any key; system automatically detects provider."
+    st.markdown("### ⚙️ OpenRouter Settings")
+    st.markdown("API Key `.env` file se automatically load hoti hai.")
+
+    env_openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+    api_key_input = st.text_input(
+        "OpenRouter API Key",
+        value=env_openrouter_key,
+        type="password",
+        help="OpenRouter API Key (loaded from .env). You can also edit it here."
     )
 
-    if "OpenRouter" in provider_choice:
-        default_model = "nvidia/nemotron-3.5-lightning:free"
-        model_options = [
-            "nvidia/nemotron-3.5-lightning:free",
-            "anthropic/claude-3.5-sonnet",
-            "meta-llama/llama-3.3-70b-instruct",
-            "google/gemma-4-31b-it:free"
-        ]
-    elif "Groq" in provider_choice:
-        default_model = "llama-3.3-70b-versatile"
-        model_options = [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768"
-        ]
-    else:
-        default_model = "claude-3-5-sonnet-20241022"
-        model_options = [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022"
-        ]
-
-    selected_model = st.selectbox("Model", options=model_options, index=0)
+    model_options = [
+        "nvidia/nemotron-3.5-lightning:free",
+        "anthropic/claude-3.5-sonnet",
+        "meta-llama/llama-3.3-70b-instruct",
+        "google/gemma-4-31b-it:free"
+    ]
+    selected_model = st.selectbox(
+        "OpenRouter Model",
+        options=model_options,
+        index=0,
+        help="Select which model to run via OpenRouter."
+    )
 
     st.markdown("---")
     st.markdown("### 👥 Member 1 Role")
@@ -109,7 +101,7 @@ with st.sidebar:
 # Main Content Header
 st.markdown('<div class="badge-member">Member 1 — Design Agent</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-title">🛋️ InterioOS AI — Design Concept Generator</div>', unsafe_allow_html=True)
-st.markdown("Apni requirement aur API Key enter karein. **LangGraph StateGraph** execute hoga aur response **State** mein save hoga.")
+st.markdown("User requirement enter karein. **LangGraph StateGraph** OpenRouter ko call karega aur response **State** mein save karega.")
 
 st.markdown("---")
 
@@ -150,38 +142,34 @@ with st.form("design_agent_form"):
     with col_f3:
         style_input = st.text_input("Style (Optional)", value="Modern Contemporary")
 
-    # API Key Input Directly on Main Page
-    st.markdown("##### 🔑 API Key (OpenRouter / Groq / Claude)")
-    env_default_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("GROQ_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or ""
-    api_key_input = st.text_input(
-        "Enter your API Key here *",
-        value=env_default_key,
+    # API Key Input (Defaults to .env)
+    st.markdown("##### 🔑 OpenRouter API Key")
+    key_field = st.text_input(
+        "API Key (automatically loaded from .env) *",
+        value=api_key_input if api_key_input else env_openrouter_key,
         type="password",
-        placeholder="Paste your key here (e.g. sk-or-v1-... for OpenRouter or gsk_... for Groq)",
-        help="System will auto-detect whether it's OpenRouter, Groq, or Claude!"
+        placeholder="sk-or-v1-...",
+        help="Your OpenRouter key is loaded from .env or you can enter it here."
     )
 
-    detected_provider = detect_provider(api_key_input.strip()) if api_key_input.strip() else "openrouter"
-
-    submit_button = st.form_submit_button(f"🚀 Generate Design Concept (LangGraph + {detected_provider.upper()})")
+    submit_button = st.form_submit_button("🚀 Generate Design Concept (LangGraph + OpenRouter)")
 
 # Execution Logic
 if submit_button:
+    effective_key = key_field.strip() or api_key_input.strip() or env_openrouter_key.strip()
     if not user_req.strip():
         st.error("Please enter a valid user requirement.")
-    elif not api_key_input.strip():
-        st.warning("⚠️ Please enter your API key in the box above.")
+    elif not effective_key:
+        st.warning("⚠️ Please enter your OpenRouter API key in the box above or in .env file.")
     else:
-        active_provider = detect_provider(api_key_input.strip())
-        with st.spinner(f"🤖 Design Agent is generating concept via {active_provider.upper()} & saving into LangGraph State..."):
+        with st.spinner("🤖 Design Agent is generating concept via OpenRouter & saving into LangGraph State..."):
             result_state: InterioOSState = generate_design_concept(
                 requirement=user_req.strip(),
                 budget=budget_input.strip() if budget_input else None,
                 room_type=room_type_input.strip() if room_type_input else None,
                 style=style_input.strip() if style_input else None,
-                provider=active_provider,
                 model=selected_model,
-                api_key=api_key_input.strip()
+                api_key=effective_key
             )
 
             st.session_state["interio_os_state"] = result_state
@@ -189,7 +177,7 @@ if submit_button:
             if result_state.get("error"):
                 st.error(f"❌ Error: {result_state['error']}")
             else:
-                st.success(f"✅ Design concept generated & successfully saved in LangGraph State via {result_state.get('provider', '').upper()}!")
+                st.success("✅ Design concept generated & successfully saved in LangGraph State!")
 
 # Display Results if Available
 saved_state = st.session_state.get("interio_os_state")

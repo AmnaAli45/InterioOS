@@ -9,7 +9,7 @@
 ### **Responsibility & Deliverables:**
 1. **Python Function (`design_agent_node` / `generate_design_concept`)**:
    - Takes client requirements (e.g., room type, style, budget, preferences).
-2. **LLM API Communication (Groq LLaMA 3.3 / Claude)**:
+2. **OpenRouter API Communication**:
    - Sends targeted prompt: *"is requirement ke liye design concept do"*.
    - Instructs the model to produce structured design concepts (theme, spatial zoning, color palette, lighting, materials, furniture).
 3. **LangGraph State Preservation**:
@@ -22,7 +22,7 @@
 - **Language**: Python 3.10+
 - **Frontend / UI**: Streamlit
 - **Agent Orchestration**: LangGraph (`StateGraph`)
-- **LLM / AI Engine**: Groq (`llama-3.3-70b-versatile`) & Anthropic Claude (`claude-3-5-sonnet-20241022`)
+- **LLM / AI Engine**: OpenRouter API (`nvidia/nemotron-3.5-lightning:free` / `anthropic/claude-3.5-sonnet`)
 
 ---
 
@@ -30,10 +30,11 @@
 
 ```text
 InteriorOSAI/
-├── design_agent.py      # Core Member 1 module: LangGraph State & Groq/Claude node
+├── design_agent.py      # Core Member 1 module: LangGraph State & OpenRouter node
 ├── app.py               # Streamlit interactive UI & state inspector
-├── requirements.txt     # Dependencies (groq, langgraph, streamlit, etc.)
-├── .env.example         # Environment template for GROQ_API_KEY & ANTHROPIC_API_KEY
+├── requirements.txt     # Dependencies (requests, langgraph, streamlit, etc.)
+├── .env                 # Local API configuration (ignored by git)
+├── .env.example         # Environment template for OPENROUTER_API_KEY
 ├── .gitignore           # Protects .env secrets and cache directories
 └── README.md            # Documentation and instructions
 ```
@@ -43,12 +44,12 @@ InteriorOSAI/
 ## 🚀 Getting Started
 
 ### 1. Configure Environment Variables
-Create a `.env` file in the root directory:
+Create or edit `.env` in the root directory:
 ```env
-GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=llama-3.3-70b-versatile
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
 ```
-*(Get your free Groq key from [console.groq.com/keys](https://console.groq.com/keys))*
+*(Get your key from [openrouter.ai/keys](https://openrouter.ai/keys))*
 
 ### 2. Run with Streamlit
 Launch the interactive web interface:
@@ -71,7 +72,7 @@ class InterioOSState(TypedDict, total=False):
     budget: Optional[str]          # Project budget (e.g. 'Rs. 8 Lakh')
     room_type: Optional[str]       # Room category
     style: Optional[str]           # Aesthetic style
-    provider: Optional[str]        # 'groq' or 'claude'
+    model: Optional[str]           # Model used
     design_concept: Optional[str]  # Member 1 output saved here
     status: Optional[str]          # 'concept_generated' | 'failed'
     error: Optional[str]           # Error message if any
