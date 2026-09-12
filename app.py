@@ -1,6 +1,6 @@
 """
 InterioOS AI - Member 1: Design Agent Streamlit Application
-Tech Stack: Python, Streamlit, LangGraph, Anthropic Claude API
+Tech Stack: Python, Streamlit, LangGraph, Groq / Claude API
 """
 
 import os
@@ -42,13 +42,6 @@ st.markdown("""
         margin-bottom: 1rem;
         border: 1px solid #C7D2FE;
     }
-    .status-box {
-        background-color: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        padding: 12px 16px;
-        margin-bottom: 1rem;
-    }
     .stButton>button {
         background-color: #4F46E5;
         color: white;
@@ -72,46 +65,69 @@ if "interio_os_state" not in st.session_state:
 
 # Sidebar Configuration
 with st.sidebar:
-    st.markdown("### ⚙️ Agent Configuration")
-    st.markdown("Configure your **Claude API** credentials and agent settings.")
+    st.markdown("### ⚙️ LLM & Agent Settings")
 
-    env_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    api_key_input = st.text_input(
-        "Anthropic API Key",
-        value=env_api_key,
-        type="password",
-        help="Enter your Anthropic API Key (or set ANTHROPIC_API_KEY in your .env file)."
-    )
-
-    model_choice = st.selectbox(
-        "Claude Model",
-        options=[
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-            "claude-3-haiku-20240307",
-            "claude-3-opus-20240229"
-        ],
+    provider_choice = st.radio(
+        "Select AI Provider",
+        options=["Groq (Fast & Free)", "Anthropic Claude"],
         index=0,
-        help="Select model for design concept generation."
+        help="Choose Groq for fast free generation or Claude."
     )
+    provider_key = "groq" if "Groq" in provider_choice else "claude"
 
-    if model_choice:
-        os.environ["ANTHROPIC_MODEL"] = model_choice
+    if provider_key == "groq":
+        env_groq_key = os.getenv("GROQ_API_KEY", "")
+        api_key_input = st.text_input(
+            "Groq API Key *",
+            value=env_groq_key,
+            type="password",
+            help="Enter your Groq key (from https://console.groq.com/keys) or save in .env"
+        )
+        model_choice = st.selectbox(
+            "Groq Model",
+            options=[
+                "llama-3.3-70b-versatile",
+                "llama-3.1-8b-instant",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
+            ],
+            index=0
+        )
+        if model_choice:
+            os.environ["GROQ_MODEL"] = model_choice
+    else:
+        env_claude_key = os.getenv("ANTHROPIC_API_KEY", "")
+        api_key_input = st.text_input(
+            "Anthropic API Key *",
+            value=env_claude_key,
+            type="password",
+            help="Enter your Anthropic API Key or save in .env"
+        )
+        model_choice = st.selectbox(
+            "Claude Model",
+            options=[
+                "claude-3-5-sonnet-20241022",
+                "claude-3-5-haiku-20241022",
+                "claude-3-haiku-20240307"
+            ],
+            index=0
+        )
+        if model_choice:
+            os.environ["ANTHROPIC_MODEL"] = model_choice
 
     st.markdown("---")
-    st.markdown("### 👥 Team Role Details")
+    st.markdown("### 👥 Member 1 Role")
     st.markdown("""
     **Member 1 — Design Agent**
-    - **Input**: User Design Requirement
-    - **Action**: Prompt Claude API for design concept
-    - **State**: Saves `design_concept` in **LangGraph State**
-    - **Tech Stack**: `Python`, `Streamlit`, `LangGraph`
+    1. User se requirement input lena.
+    2. Prompt bhejna: *"is requirement ke liye design concept do"*.
+    3. Output ko **LangGraph State** mein save karna.
     """)
 
-# Main Content
+# Main Content Header
 st.markdown('<div class="badge-member">Member 1 — Design Agent</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-title">🛋️ InterioOS AI — Design Concept Generator</div>', unsafe_allow_html=True)
-st.markdown("Input client requirements to trigger the **LangGraph Design Agent**, communicate with **Claude API**, and save structured concepts into the shared multi-agent state.")
+st.markdown("User requirement enter karein. **LangGraph StateGraph** execute hoga aur response **State** mein save hoga.")
 
 st.markdown("---")
 
@@ -141,7 +157,7 @@ with st.form("design_agent_form"):
         "Design Requirement Prompt *",
         value=default_req,
         height=120,
-        help="Enter the specific client requirements, room type, style, budget, or constraints."
+        help="Client requirements, room type, style, budget, or constraints."
     )
 
     col_f1, col_f2, col_f3 = st.columns(3)
@@ -152,21 +168,22 @@ with st.form("design_agent_form"):
     with col_f3:
         style_input = st.text_input("Style (Optional)", value="Modern Contemporary")
 
-    submit_button = st.form_submit_button("🚀 Generate Design Concept (LangGraph Node)")
+    submit_button = st.form_submit_button(f"🚀 Generate Design Concept ({provider_key.upper()} + LangGraph)")
 
 # Execution Logic
 if submit_button:
     if not user_req.strip():
         st.error("Please enter a valid user requirement.")
     elif not api_key_input.strip():
-        st.warning("⚠️ Anthropic API Key is missing. Please enter your API Key in the sidebar or save it in your .env file.")
+        st.warning(f"⚠️ {provider_key.upper()} API Key missing! Sidebar mein apni key paste karein ya .env file mein add karein.")
     else:
-        with st.spinner("🤖 Design Agent is calling Claude API and updating LangGraph State..."):
+        with st.spinner(f"🤖 Design Agent is calling {provider_key.capitalize()} API & saving into LangGraph State..."):
             result_state: InterioOSState = generate_design_concept(
                 requirement=user_req.strip(),
                 budget=budget_input.strip() if budget_input else None,
                 room_type=room_type_input.strip() if room_type_input else None,
                 style=style_input.strip() if style_input else None,
+                provider=provider_key,
                 api_key=api_key_input.strip()
             )
 
@@ -175,13 +192,13 @@ if submit_button:
             if result_state.get("error"):
                 st.error(f"❌ Error: {result_state['error']}")
             else:
-                st.success("✅ Design concept successfully generated and saved into LangGraph State!")
+                st.success("✅ Design concept generated & successfully saved in LangGraph State!")
 
 # Display Results if Available
 saved_state = st.session_state.get("interio_os_state")
 if saved_state and saved_state.get("design_concept"):
     st.markdown("---")
-    st.markdown("### 📊 Agent Results & State")
+    st.markdown("### 📊 Agent Results & Saved State")
 
     tab_concept, tab_state, tab_team = st.tabs([
         "📄 Generated Design Concept",
@@ -200,21 +217,21 @@ if saved_state and saved_state.get("design_concept"):
 
     with tab_state:
         st.markdown("**Current LangGraph State (`InterioOSState`):**")
-        st.caption("This state object is maintained by LangGraph and accessible to all team members' agents.")
+        st.caption("Yeh state LangGraph ke mutabiq save hui hai aur baaqi team members ke agents ke liye ready hai.")
         st.json(saved_state)
 
     with tab_team:
         st.markdown("""
         #### 🔄 How Team Members Use This State:
-        Member 1 has populated `design_concept` in the shared state. Other agents can now continue the workflow:
+        Member 1 has populated `state["design_concept"]`. Other team members' agents can now take over:
 
-        1. **Member 2 (Cost & Material Agent)**:
+        1. **Member 2 (Cost & Material Estimator)**:
            - Reads `state["design_concept"]`
-           - Estimates materials and total project cost within budget.
+           - Calculates material quantities & costs within budget.
         2. **Member 3 (BOQ Agent)**:
-           - Extracts itemized components and creates Bill of Quantities.
+           - Generates itemized Bill of Quantities.
         3. **Member 4 (Vendor Agent)**:
-           - Matches material requirements with potential suppliers.
+           - Recommends suppliers & materials.
         4. **Member 5 (Coordinator / PM Agent)**:
-           - Builds timeline, milestones, and consolidated project report.
+           - Consolidates project timeline & reports.
         """)

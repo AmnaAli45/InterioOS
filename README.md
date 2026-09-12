@@ -9,9 +9,9 @@
 ### **Responsibility & Deliverables:**
 1. **Python Function (`design_agent_node` / `generate_design_concept`)**:
    - Takes client requirements (e.g., room type, style, budget, preferences).
-2. **Claude API Communication**:
+2. **LLM API Communication (Groq LLaMA 3.3 / Claude)**:
    - Sends targeted prompt: *"is requirement ke liye design concept do"*.
-   - Instructs Claude to produce structured design concepts (theme, spatial zoning, color palette, lighting, materials, furniture).
+   - Instructs the model to produce structured design concepts (theme, spatial zoning, color palette, lighting, materials, furniture).
 3. **LangGraph State Preservation**:
    - Saves generated response into `state["design_concept"]` within `InterioOSState`.
    - Makes the concept accessible for downstream team agents (Cost Estimator, BOQ, Vendor, Coordinator).
@@ -22,7 +22,7 @@
 - **Language**: Python 3.10+
 - **Frontend / UI**: Streamlit
 - **Agent Orchestration**: LangGraph (`StateGraph`)
-- **LLM / AI**: Anthropic Claude API (`claude-3-5-sonnet-20241022`)
+- **LLM / AI Engine**: Groq (`llama-3.3-70b-versatile`) & Anthropic Claude (`claude-3-5-sonnet-20241022`)
 
 ---
 
@@ -30,10 +30,10 @@
 
 ```text
 InteriorOSAI/
-├── design_agent.py      # Core Member 1 module: LangGraph State & Claude API node
+├── design_agent.py      # Core Member 1 module: LangGraph State & Groq/Claude node
 ├── app.py               # Streamlit interactive UI & state inspector
-├── requirements.txt     # Dependencies (anthropic, langgraph, streamlit, etc.)
-├── .env.example         # Environment template for ANTHROPIC_API_KEY
+├── requirements.txt     # Dependencies (groq, langgraph, streamlit, etc.)
+├── .env.example         # Environment template for GROQ_API_KEY & ANTHROPIC_API_KEY
 ├── .gitignore           # Protects .env secrets and cache directories
 └── README.md            # Documentation and instructions
 ```
@@ -45,9 +45,10 @@ InteriorOSAI/
 ### 1. Configure Environment Variables
 Create a `.env` file in the root directory:
 ```env
-ANTHROPIC_API_KEY=your_claude_api_key_here
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
+*(Get your free Groq key from [console.groq.com/keys](https://console.groq.com/keys))*
 
 ### 2. Run with Streamlit
 Launch the interactive web interface:
@@ -70,6 +71,7 @@ class InterioOSState(TypedDict, total=False):
     budget: Optional[str]          # Project budget (e.g. 'Rs. 8 Lakh')
     room_type: Optional[str]       # Room category
     style: Optional[str]           # Aesthetic style
+    provider: Optional[str]        # 'groq' or 'claude'
     design_concept: Optional[str]  # Member 1 output saved here
     status: Optional[str]          # 'concept_generated' | 'failed'
     error: Optional[str]           # Error message if any
