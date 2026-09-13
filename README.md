@@ -13,7 +13,8 @@ flowchart TD
     M3 --> M2[Member 2: Cost Estimator<br/>Calculates Rates & Budget Feasibility]
     M2 --> M4[Member 4: Timeline Agent<br/>Builds Sequential Execution Schedule]
     M4 --> M5[Member 5: Coordinator Agent<br/>LangGraph Orchestrator & Master Report]
-    M5 --> EndReport([🏛️ Final Master Project Dossier & Executive Summary])
+    M5 --> M6[Member 6: Streamlit UI<br/>3D Room Preview & Client Dashboard]
+    M6 --> EndReport([Final Master Project Dossier & Interactive UI])
 ```
 
 ---
@@ -59,9 +60,25 @@ flowchart TD
 
 ---
 
+### 👥 Member 6 — Streamlit UI/UX & 3D Visualization
+- **Entry Point**: `app.py`
+- **UI Framework**: Streamlit with Material Symbols, responsive CSS, and bordered dashboard sections.
+- **Responsibilities**:
+  1. **Client Input**: Collect the project requirement, budget, room type, and preferred style.
+  2. **Pipeline Integration**: Call Member 5's `run_interioos_pipeline()` function and display the returned `InterioOSState` without changing agent logic.
+  3. **Deliverable Dashboard**: Present the design concept, BOQ, cost estimate, timeline, and final master report.
+  4. **BOQ-to-Scene Bridging**: Use `parse_boq_items()` from `boq_parser.py` to extract displayable items from Member 3's BOQ output.
+  5. **3D Room Preview**: Render a lightweight Three.js room through Streamlit, with orbit controls, labeled BOQ items, transparent walls, and category-based colors.
+  6. **Fallback and Readability**: Provide demo data when the live pipeline or API keys are unavailable, plus an optional `assets/background.jpg` page background with a light overlay.
+
+Member 6 owns presentation and interaction only. The shared state schema and all agent behavior remain controlled by Members 1–5.
+
+---
+
 ## 🛠️ Tech Stack
 - **Language**: Python 3.10+
 - **Frontend / UI**: Streamlit
+- **3D Visualization**: Three.js via CDN and Streamlit components
 - **Agent Orchestration**: LangGraph (`StateGraph`, `START`, `END`)
 - **LLM Engines**: Anthropic Claude (`claude-3-5-sonnet`) & Groq (`openai/gpt-oss-120b`)
 - **Data & Tables**: Pandas, CSV
@@ -78,10 +95,14 @@ InterioOS/
 │   ├── cost_agent.py             # Member 2: Cost Estimator (Pricing Data)
 │   ├── timeline_agent.py         # Member 4: Timeline Agent (Claude/Groq)
 │   └── coordinator_agent.py      # Member 5: Coordinator & Pipeline Orchestrator
+├── assets/
+│   ├── README.md                 # Optional UI asset instructions
+│   └── background.jpg            # Optional muted interior background image
 ├── data/
 │   └── pricing_data.csv          # Unit rates for finishes & furniture
+├── boq_parser.py                 # Member 6: BOQ text to 3D scene item parser
 ├── design_agent.py               # Member 1: Design Agent (LangGraph + Groq)
-├── app.py                        # Streamlit UI with 1-Click 5-Agent Pipeline & Master Report
+├── app.py                        # Member 6: Streamlit dashboard, 3D UI & pipeline entry point
 ├── test_coordinator.py          # Member 5 Coordinator Agent standalone test
 ├── test_langgraph_pipeline.py    # Complete 5-Agent end-to-end pipeline test
 ├── test_timeline.py              # Member 4 Timeline Agent test
@@ -115,6 +136,8 @@ Launch the interactive web interface:
 streamlit run app.py
 ```
 
+The app works in demo mode when API keys or optional agent dependencies are unavailable. For the live pipeline, install the dependencies and configure the keys above. To customize the page background, place a muted interior image at `assets/background.jpg`; the UI falls back to a light background when the file is absent.
+
 ### 3. Run Tests from Terminal (CLI)
 ```bash
 # Test Member 5 Coordinator Agent
@@ -122,6 +145,9 @@ python test_coordinator.py
 
 # Test Full 5-Agent Multi-Agent LangGraph Pipeline (1 -> 3 -> 2 -> 4 -> 5)
 python test_langgraph_pipeline.py
+
+# Launch Member 6's Streamlit UI (pipeline + 3D room preview)
+streamlit run app.py
 
 # Test Member 4 Timeline Agent
 python test_timeline.py
