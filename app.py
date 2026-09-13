@@ -7,8 +7,9 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
-# Import the Design Agent LangGraph module
+# Import the LangGraph modules
 from design_agent import generate_design_concept, InterioOSState
+from agents.boq_agent import boq_agent
 
 # Page configuration
 st.set_page_config(
@@ -140,3 +141,34 @@ if saved_state and saved_state.get("design_concept"):
         file_name="interior_design_concept.md",
         mime="text/markdown"
     )
+
+    # Member 3: BOQ Agent Section
+    st.markdown("---")
+    st.markdown('<div class="badge-member">Member 3 — BOQ Agent</div>', unsafe_allow_html=True)
+    st.markdown("### 🧱 Bill of Quantities (BOQ) & Material List")
+    st.markdown("Design concept se materials ki complete list generate karein (Paint, Tiles/Flooring, Furniture, Electrical) with realistic quantities.")
+
+    if st.button("📦 Generate Material List & BOQ", key="generate_boq_btn"):
+        with st.spinner("⚡ Claude/Groq analyzing design concept and generating BOQ with quantities..."):
+            updated_state = boq_agent(saved_state)
+            st.session_state["interio_os_state"] = updated_state
+            if updated_state.get("error"):
+                st.error(f"❌ {updated_state['error']}")
+            else:
+                st.success(f"✅ BOQ generated via {updated_state.get('boq_engine', 'AI')} and saved to State!")
+
+    # Display BOQ results if generated
+    if saved_state.get("boq_markdown"):
+        st.markdown("#### 📋 Material & Quantity Breakdown")
+        st.markdown(saved_state["boq_markdown"])
+
+        if saved_state.get("items"):
+            with st.expander(f"🔍 Structured Items for Cost Agent ({len(saved_state['items'])} items)", expanded=False):
+                st.table(saved_state["items"])
+
+        st.download_button(
+            label="📥 Download BOQ Material List (.md)",
+            data=saved_state["boq_markdown"],
+            file_name="boq_material_list.md",
+            mime="text/markdown"
+        )

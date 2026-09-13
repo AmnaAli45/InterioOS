@@ -13,11 +13,14 @@ load_dotenv()
 # 1. LOAD PRICING DATA
 # =========================================================
 
+DEFAULT_CSV_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "pricing_data.csv")
+
 def load_prices(filename="data/pricing_data.csv"):
 
     prices = {}
 
-    with open(filename, "r", encoding="utf-8") as file:
+    target_file = filename if os.path.exists(filename) else DEFAULT_CSV_PATH
+    with open(target_file, "r", encoding="utf-8") as file:
 
         reader = csv.DictReader(file)
 

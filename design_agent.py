@@ -33,8 +33,12 @@ class InterioOSState(TypedDict, total=False):
     room_type: Optional[str]       # Optional room type
     style: Optional[str]           # Optional style preference
     model: Optional[str]           # Model name used
-    design_concept: Optional[str]  # Generated design concept (Saved in LangGraph State)
-    status: Optional[str]          # Workflow status ('concept_generated', 'failed')
+    design_concept: Optional[str]  # Generated design concept (Member 1 Output)
+    boq_markdown: Optional[str]    # Generated BOQ / Material list in Markdown (Member 3 Output)
+    items: Optional[list]          # Structured items list for downstream cost estimation (Member 3 Output)
+    boq_status: Optional[str]      # BOQ status ('completed', 'failed')
+    cost: Optional[Dict[str, Any]] # Cost calculation breakdown (Member 2 Output)
+    status: Optional[str]          # Overall workflow status
     error: Optional[str]           # Error message if any
 
 

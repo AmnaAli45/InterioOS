@@ -18,25 +18,51 @@
 
 ---
 
+---
+
+## 👥 Member 3 — BOQ Agent (Bill of Quantities / Material List)
+
+### **Responsibility & Deliverables:**
+1. **LangGraph Node (`boq_agent` / `boq_agent_node`)**:
+   - Takes `design_concept` from Member 1.
+2. **LLM API Communication (Claude / Groq Engine)**:
+   - Queries Claude: *"is design ke liye materials ki list banao (paint, tiles, furniture) with quantity"*.
+   - Produces a comprehensive Material List (Paint, Tiles/Flooring, Carpentry/Furniture, Lighting, False Ceiling, Decor) with realistic quantities and units.
+3. **LangGraph State Preservation**:
+   - Saves formatted Markdown table into `state["boq_markdown"]`.
+   - Saves structured items into `state["items"]` (`[{"name": "...", "quantity": ..., "unit": "..."}]`) for downstream **Member 2 (Cost Estimator)**.
+
+---
+
 ## 🛠️ Tech Stack
 - **Language**: Python 3.10+
 - **Frontend / UI**: Streamlit
 - **Agent Orchestration**: LangGraph (`StateGraph`)
-- **LLM / AI Engine**: Groq (`openai/gpt-oss-120b`)
+- **LLM / AI Engine**: Anthropic Claude (`claude-3-5-sonnet`) with Groq fallback
+- **Data & Tables**: Pandas, CSV
 
 ---
 
 ## 📁 Project Structure
 
 ```text
-InteriorOSAI/
-├── design_agent.py      # Core Member 1 module: LangGraph State & Groq node
-├── app.py               # Streamlit interactive UI (clean concept view)
-├── requirements.txt     # Dependencies (groq, langgraph, streamlit, etc.)
-├── .env                 # Local API configuration (ignored by git)
-├── .env.example         # Environment template for GROQ_API_KEY
-├── .gitignore           # Protects .env secrets and cache directories
-└── README.md            # Documentation and instructions
+InterioOS/
+├── agents/
+│   ├── __init__.py          # Agent package exports
+│   ├── boq_agent.py         # Member 3: BOQ Agent (Claude/Groq)
+│   └── cost_agent.py        # Member 2: Cost Estimator
+├── data/
+│   └── pricing_data.csv     # Unit rates for finishes & furniture
+├── design_agent.py          # Member 1: Design Agent (LangGraph + Groq)
+├── app.py                   # Streamlit UI with Design & BOQ generation
+├── test_boq.py              # Member 3 BOQ Agent standalone test
+├── test_langgraph_pipeline.py # 3-Agent end-to-end pipeline test
+├── test_cost.py             # Member 2 Cost Agent test
+├── test_groq.py             # Groq connectivity test
+├── test_langgraph_cost.py   # Cost Agent LangGraph test
+├── requirements.txt         # Dependencies
+├── .env.example             # Environment template
+└── README.md                # Documentation and instructions
 ```
 
 ---
@@ -46,10 +72,14 @@ InteriorOSAI/
 ### 1. Configure Environment Variables
 Create or edit `.env` in the root directory:
 ```env
+# Groq (Fast Inference)
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=openai/gpt-oss-120b
+
+# Anthropic Claude (Member 3 BOQ Agent)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
-*(Get your free key from [console.groq.com/keys](https://console.groq.com/keys))*
 
 ### 2. Run with Streamlit
 Launch the interactive web interface:
@@ -57,9 +87,16 @@ Launch the interactive web interface:
 streamlit run app.py
 ```
 
-### 3. Run directly from Terminal (CLI)
+### 3. Run Tests from Terminal (CLI)
 ```bash
-python design_agent.py
+# Test Member 3 BOQ Agent
+python test_boq.py
+
+# Test Full Multi-Agent Pipeline (Member 1 -> 3 -> 2)
+python test_langgraph_pipeline.py
+
+# Test Member 2 Cost Agent
+python test_cost.py
 ```
 
 ---
@@ -73,9 +110,11 @@ class InterioOSState(TypedDict, total=False):
     room_type: Optional[str]       # Room category
     style: Optional[str]           # Aesthetic style
     model: Optional[str]           # Model used
-    design_concept: Optional[str]  # Member 1 output saved here
-    status: Optional[str]          # 'concept_generated' | 'failed'
+    design_concept: Optional[str]  # Member 1 Output: Design concept
+    boq_markdown: Optional[str]    # Member 3 Output: Markdown BOQ material list
+    items: Optional[list]          # Member 3 Output: Structured items for cost calculation
+    boq_status: Optional[str]      # Member 3 Status: 'completed' | 'failed'
+    cost: Optional[Dict[str, Any]] # Member 2 Output: Cost calculation breakdown
+    status: Optional[str]          # Workflow status
     error: Optional[str]           # Error message if any
 ```
-
-Downstream agents (Member 2 Cost Estimator, Member 3 BOQ Agent, Member 4 Vendor Agent, etc.) receive this state directly and process `state["design_concept"]`.
