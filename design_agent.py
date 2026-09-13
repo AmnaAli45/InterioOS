@@ -26,7 +26,12 @@ DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 class InterioOSState(TypedDict, total=False):
     """
     Multi-Agent Shared State Schema for InterioOS.
-    Member 1 (Design Agent) inputs 'user_requirement' and populates 'design_concept'.
+    Shared across all 5 Agents:
+    - Member 1: Design Agent (design_concept)
+    - Member 3: BOQ Agent (boq_markdown, items, boq_status)
+    - Member 2: Cost Agent (cost)
+    - Member 4: Timeline Agent (timeline_markdown, estimated_duration, timeline_status)
+    - Member 5: Coordinator Agent (final_report, coordinator_status, coordinator_engine)
     """
     user_requirement: str          # Client requirement input
     budget: Optional[str]          # Optional budget information
@@ -37,11 +42,15 @@ class InterioOSState(TypedDict, total=False):
     boq_markdown: Optional[str]    # Generated BOQ / Material list in Markdown (Member 3 Output)
     items: Optional[List[Dict[str, Any]]] # Structured items list for downstream cost estimation (Member 3 Output)
     boq_status: Optional[str]      # BOQ status ('completed', 'failed')
+    boq_engine: Optional[str]      # BOQ engine used
     cost: Optional[Dict[str, Any]] # Cost calculation breakdown (Member 2 Output)
     timeline_markdown: Optional[str] # Project execution schedule in Markdown (Member 4 Output)
     estimated_duration: Optional[str] # Total project duration (e.g. '4-5 Weeks', '30 Days')
     timeline_status: Optional[str] # Timeline status ('completed', 'failed')
     timeline_engine: Optional[str] # LLM engine used for timeline
+    final_report: Optional[str]    # Combined Master Project Report (Member 5 Output)
+    coordinator_status: Optional[str] # Coordinator status ('completed', 'failed')
+    coordinator_engine: Optional[str] # LLM engine used for coordinator report
     status: Optional[str]          # Overall workflow status
     error: Optional[str]           # Error message if any
 

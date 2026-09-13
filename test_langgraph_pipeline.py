@@ -1,12 +1,23 @@
 """
 InterioOS AI - Multi-Agent LangGraph Pipeline Test
-Demonstrates complete multi-agent collaboration:
+Demonstrates complete multi-agent collaboration across all 5 Agents:
   Member 1: Design Agent (generates design concept)
        ↓
-  Member 3: BOQ Agent (Claude generates material list with quantities)
+  Member 3: BOQ Agent (Claude/Groq generates material list with quantities)
        ↓
   Member 2: Cost Agent (calculates estimated project cost against budget)
+       ↓
+  Member 4: Timeline Agent (creates project execution schedule & duration)
+       ↓
+  Member 5: Coordinator Agent (synthesizes executive summary & final master report)
 """
+
+import sys
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from typing import cast, Any
 from langgraph.graph import StateGraph, START, END
@@ -14,39 +25,20 @@ from design_agent import InterioOSState, design_agent_node
 from agents.boq_agent import boq_agent_node
 from agents.cost_agent import cost_agent
 from agents.timeline_agent import timeline_agent_node
-
-
-def build_pipeline():
-    """Builds and compiles the 4-agent InterioOS LangGraph pipeline."""
-    workflow = StateGraph(InterioOSState)
-
-    # Add agent nodes
-    workflow.add_node("design_agent", design_agent_node)
-    workflow.add_node("boq_agent", boq_agent_node)
-    workflow.add_node("cost_agent", cost_agent)
-    workflow.add_node("timeline_agent", timeline_agent_node)
-
-    # Chain nodes in sequence: Member 1 -> 3 -> 2 -> 4
-    workflow.add_edge(START, "design_agent")
-    workflow.add_edge("design_agent", "boq_agent")
-    workflow.add_edge("boq_agent", "cost_agent")
-    workflow.add_edge("cost_agent", "timeline_agent")
-    workflow.add_edge("timeline_agent", END)
-
-    return workflow.compile()
+from agents.coordinator_agent import coordinator_agent_node, build_full_pipeline
 
 
 if __name__ == "__main__":
-    print("==================================================")
-    print(" INTERIOOS AI: MULTI-AGENT PIPELINE (1 -> 3 -> 2 -> 4) ")
-    print("==================================================")
+    print("================================================================")
+    print(" INTERIOOS AI: FULL 5-AGENT MULTI-AGENT PIPELINE (1->3->2->4->5) ")
+    print("================================================================")
 
-    pipeline = build_pipeline()
+    pipeline = build_full_pipeline()
 
     initial_state: InterioOSState = {
         "user_requirement": "Design a contemporary minimalist bedroom within Rs. 8 lakh budget.",
         "budget": "800000",
-        "room_type": "Bedroom",
+        "room_type": "Master Bedroom",
         "style": "Contemporary Minimalist"
     }
 
@@ -57,12 +49,14 @@ if __name__ == "__main__":
 
     if result.get("error"):
         print(f"Live API Pipeline note: {result.get('error')}")
-        print("\n--- Running Offline Pipeline State Simulation (Member 1 -> 3 -> 2 -> 4) ---")
+        print("\n--- Running Offline Pipeline State Simulation (Member 1 -> 3 -> 2 -> 4 -> 5) ---")
 
         # Simulate Member 1 (Design Agent)
-        simulated_state = {
+        simulated_state: InterioOSState = {
             "user_requirement": initial_state["user_requirement"],
             "budget": initial_state["budget"],
+            "room_type": initial_state["room_type"],
+            "style": initial_state["style"],
             "design_concept": (
                 "Modern Bedroom Design Concept: 200 sqft walls in neutral paint, "
                 "168 sqft wooden-finish tile flooring, 1 King bed, 1 Wardrobe, "
@@ -126,15 +120,23 @@ if __name__ == "__main__":
         print("\n[Step 4] Member 4 Output (Project Execution Timeline):")
         print(f"  Estimated Duration : {timeline_state.get('estimated_duration')}")
         print(f"  Timeline Status    : {timeline_state.get('timeline_status')}")
-        print("\n[SUCCESS] End-to-end 4-agent state handoff (1 -> 3 -> 2 -> 4) verified!")
+
+        # Run Member 5 (Coordinator Agent)
+        final_sim_state = coordinator_agent_node(timeline_state)
+        print("\n[Step 5] Member 5 Output (Coordinator Master Report):")
+        print(f"  Coordinator Status : {final_sim_state.get('coordinator_status')}")
+        print(f"  Coordinator Engine : {final_sim_state.get('coordinator_engine')}")
+        print(f"  Report Length      : {len(final_sim_state.get('final_report', ''))} characters")
+
+        print("\n[SUCCESS] End-to-end 5-agent state handoff (1 -> 3 -> 2 -> 4 -> 5) verified!")
     else:
         print("\n--- 1. MEMBER 1: DESIGN CONCEPT ---")
         if result.get("design_concept"):
-            print(result["design_concept"][:300] + "...\n")
+            print(result["design_concept"][:250] + "...\n")
 
         print("--- 2. MEMBER 3: BOQ MATERIAL LIST ---")
         if result.get("boq_markdown"):
-            print(result["boq_markdown"][:300] + "...\n")
+            print(result["boq_markdown"][:250] + "...\n")
         print(f"Extracted Items Count: {len(result.get('items', []))}")
 
         print("--- 3. MEMBER 2: COST ESTIMATION ---")
@@ -146,5 +148,12 @@ if __name__ == "__main__":
 
         print("\n--- 4. MEMBER 4: TIMELINE SCHEDULE ---")
         if result.get("timeline_markdown"):
-            print(result["timeline_markdown"][:300] + "...\n")
+            print(result["timeline_markdown"][:250] + "...\n")
             print(f"Estimated Duration: {result.get('estimated_duration')}")
+
+        print("\n--- 5. MEMBER 5: FINAL COMBINED MASTER REPORT ---")
+        if result.get("final_report"):
+            print(result["final_report"][:400] + "...\n")
+            print(f"Coordinator Status: {result.get('coordinator_status')}")
+            print(f"Total Master Report Characters: {len(result.get('final_report', ''))}")
+
