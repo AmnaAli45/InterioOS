@@ -34,6 +34,21 @@
 
 ---
 
+## 👥 Member 4 — Timeline Agent (Project Execution Schedule)
+
+### **Responsibility & Deliverables:**
+1. **LangGraph Node (`timeline_agent` / `timeline_agent_node`)**:
+   - Takes Design Concept (`state["design_concept"]`) and Cost / Material Scope (`state["cost"]`, `state["items"]`).
+2. **LLM API Communication (Claude / Groq Engine)**:
+   - Queries Claude: *"is project ka simple timeline banao — kaunsa kaam kab hoga"*.
+   - Generates a chronological phase-by-phase execution schedule (site prep, civil/electrical, flooring, carpentry, painting, fixtures, handover) with realistic day/week durations.
+3. **LangGraph State Preservation**:
+   - Saves formatted execution schedule into `state["timeline_markdown"]`.
+   - Saves duration metric into `state["estimated_duration"]`.
+   - Saves workflow status into `state["timeline_status"]`.
+
+---
+
 ## 🛠️ Tech Stack
 - **Language**: Python 3.10+
 - **Frontend / UI**: Streamlit
@@ -50,13 +65,15 @@ InterioOS/
 ├── agents/
 │   ├── __init__.py          # Agent package exports
 │   ├── boq_agent.py         # Member 3: BOQ Agent (Claude/Groq)
-│   └── cost_agent.py        # Member 2: Cost Estimator
+│   ├── cost_agent.py        # Member 2: Cost Estimator
+│   └── timeline_agent.py    # Member 4: Timeline Agent (Claude/Groq)
 ├── data/
 │   └── pricing_data.csv     # Unit rates for finishes & furniture
 ├── design_agent.py          # Member 1: Design Agent (LangGraph + Groq)
-├── app.py                   # Streamlit UI with Design & BOQ generation
+├── app.py                   # Streamlit UI with Design, BOQ & Timeline
+├── test_timeline.py         # Member 4 Timeline Agent standalone test
 ├── test_boq.py              # Member 3 BOQ Agent standalone test
-├── test_langgraph_pipeline.py # 3-Agent end-to-end pipeline test
+├── test_langgraph_pipeline.py # 4-Agent end-to-end pipeline test
 ├── test_cost.py             # Member 2 Cost Agent test
 ├── test_groq.py             # Groq connectivity test
 ├── test_langgraph_cost.py   # Cost Agent LangGraph test
@@ -76,7 +93,7 @@ Create or edit `.env` in the root directory:
 GROQ_API_KEY=your_groq_api_key_here
 GROQ_MODEL=openai/gpt-oss-120b
 
-# Anthropic Claude (Member 3 BOQ Agent)
+# Anthropic Claude (Member 3 BOQ & Member 4 Timeline)
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
@@ -89,10 +106,13 @@ streamlit run app.py
 
 ### 3. Run Tests from Terminal (CLI)
 ```bash
+# Test Member 4 Timeline Agent
+python test_timeline.py
+
 # Test Member 3 BOQ Agent
 python test_boq.py
 
-# Test Full Multi-Agent Pipeline (Member 1 -> 3 -> 2)
+# Test Full Multi-Agent Pipeline (Member 1 -> 3 -> 2 -> 4)
 python test_langgraph_pipeline.py
 
 # Test Member 2 Cost Agent
@@ -115,6 +135,10 @@ class InterioOSState(TypedDict, total=False):
     items: Optional[list]          # Member 3 Output: Structured items for cost calculation
     boq_status: Optional[str]      # Member 3 Status: 'completed' | 'failed'
     cost: Optional[Dict[str, Any]] # Member 2 Output: Cost calculation breakdown
+    timeline_markdown: Optional[str] # Member 4 Output: Project execution schedule
+    estimated_duration: Optional[str] # Member 4 Output: Overall project duration
+    timeline_status: Optional[str] # Member 4 Status: 'completed' | 'failed'
+    timeline_engine: Optional[str] # Member 4 Engine used (Claude / Groq)
     status: Optional[str]          # Workflow status
     error: Optional[str]           # Error message if any
 ```

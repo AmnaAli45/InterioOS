@@ -13,7 +13,7 @@ Role & Responsibility:
 import os
 import re
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Tuple
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -23,7 +23,7 @@ DEFAULT_ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-202410
 DEFAULT_GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
-def parse_boq_response(response_text: str) -> tuple[str, List[Dict[str, Any]]]:
+def parse_boq_response(response_text: str) -> Tuple[str, List[Dict[str, Any]]]:
     """
     Parses LLM response to separate Markdown table and structured items JSON.
     Returns (boq_markdown, structured_items).
@@ -76,14 +76,15 @@ def query_claude(prompt: str, system_prompt: str, model: str, api_key: str) -> s
     """Queries Anthropic Claude API."""
     import anthropic
     client = anthropic.Anthropic(api_key=api_key)
+    messages_payload: Any = [{"role": "user", "content": prompt}]
     response = client.messages.create(
         model=model,
         max_tokens=3000,
-        temperature=0.3,
         system=system_prompt,
-        messages=[{"role": "user", "content": prompt}]
+        messages=messages_payload
     )
-    return "".join([block.text for block in response.content if hasattr(block, "text")]).strip()
+    text_parts = [getattr(block, "text", "") for block in response.content]
+    return "".join(text_parts).strip()
 
 
 def query_groq_fallback(prompt: str, system_prompt: str, model: str, api_key: str) -> str:
@@ -99,10 +100,11 @@ def query_groq_fallback(prompt: str, system_prompt: str, model: str, api_key: st
         temperature=0.3,
         max_tokens=3000,
     )
-    return chat_completion.choices[0].message.content.strip()
+    raw_text = chat_completion.choices[0].message.content or ""
+    return raw_text.strip()
 
 
-def boq_agent(state: Dict[str, Any]) -> Dict[str, Any]:
+def boq_agent(state: Any) -> Any:
     """
     Member 3 - BOQ Agent Node:
     1. Extracts design_concept from state.
@@ -191,7 +193,7 @@ def boq_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     return state
 
 
-def boq_agent_node(state: Dict[str, Any]) -> Dict[str, Any]:
+def boq_agent_node(state: Any) -> Any:
     """LangGraph node alias for boq_agent."""
     return boq_agent(state)
 
@@ -211,11 +213,11 @@ if __name__ == "__main__":
     result_state = boq_agent(test_state)
 
     if result_state.get("error"):
-        print(f"[ERROR]: {result_state['error']}")
+        print(f"[ERROR]: {result_state.get('error')}")
     else:
         print(f"[SUCCESS] BOQ generated via {result_state.get('boq_engine')}!")
         print("\n--- BOQ Table ---")
-        print(result_state.get("boq_markdown")[:400] + "...")
+        print((result_state.get("boq_markdown") or "")[:400] + "...")
         print(f"\nExtracted Items ({len(result_state.get('items', []))} items):")
         for item in result_state.get("items", [])[:5]:
             print(f" - {item['name']}: {item['quantity']} {item.get('unit', '')}")

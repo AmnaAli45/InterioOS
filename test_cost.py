@@ -64,7 +64,7 @@ for item in result["cost"]["items"]:
     print(
 
         f"{item['item']}: "
-        f"{item['quantity']} × "
+        f"{item['quantity']} x "
         f"Rs. {item['unit_price']:,.0f} = "
         f"Rs. {item['total']:,.0f}"
 

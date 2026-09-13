@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 # Import the LangGraph modules
 from design_agent import generate_design_concept, InterioOSState
 from agents.boq_agent import boq_agent
+from agents.cost_agent import cost_agent
+from agents.timeline_agent import timeline_agent
 
 # Page configuration
 st.set_page_config(
@@ -20,6 +22,37 @@ st.set_page_config(
 
 # Load environment variables from .env
 load_dotenv()
+
+# Sidebar: API Key Configuration & Status
+with st.sidebar:
+    st.markdown("### 🔑 API Configuration")
+    env_groq = os.getenv("GROQ_API_KEY", "")
+    env_anthropic = os.getenv("ANTHROPIC_API_KEY", "")
+
+    groq_input = st.text_input(
+        "Groq API Key",
+        value=env_groq,
+        type="password",
+        help="Get free key at console.groq.com/keys"
+    )
+    anthropic_input = st.text_input(
+        "Anthropic API Key (Optional)",
+        value=env_anthropic,
+        type="password",
+        help="For Claude (Member 3 BOQ & Member 4 Timeline)"
+    )
+
+    if groq_input:
+        os.environ["GROQ_API_KEY"] = groq_input.strip()
+    if anthropic_input:
+        os.environ["ANTHROPIC_API_KEY"] = anthropic_input.strip()
+
+    st.markdown("---")
+    st.markdown("### 👥 Multi-Agent Pipeline")
+    st.markdown("1. **Member 1**: Design Concept (Groq)")
+    st.markdown("2. **Member 3**: BOQ Material List (Claude/Groq)")
+    st.markdown("3. **Member 2**: Cost Estimator (Pricing Data)")
+    st.markdown("4. **Member 4**: Execution Timeline (Claude/Groq)")
 
 # Custom CSS for clean, premium styling
 st.markdown("""
@@ -124,7 +157,7 @@ if submit_button:
             st.session_state["interio_os_state"] = result_state
 
             if result_state.get("error"):
-                st.error(f"❌ Error: {result_state['error']}")
+                st.error(f"❌ Error: {result_state.get('error')}")
             else:
                 st.success("✅ Design concept generated & successfully saved in LangGraph State!")
 
@@ -151,11 +184,14 @@ if saved_state and saved_state.get("design_concept"):
     if st.button("📦 Generate Material List & BOQ", key="generate_boq_btn"):
         with st.spinner("⚡ Claude/Groq analyzing design concept and generating BOQ with quantities..."):
             updated_state = boq_agent(saved_state)
+            if updated_state.get("items"):
+                # Automatically run Member 2 Cost Estimator using the generated items
+                updated_state = cost_agent(updated_state)
             st.session_state["interio_os_state"] = updated_state
             if updated_state.get("error"):
                 st.error(f"❌ {updated_state['error']}")
             else:
-                st.success(f"✅ BOQ generated via {updated_state.get('boq_engine', 'AI')} and saved to State!")
+                st.success(f"✅ BOQ & Cost Estimation generated and saved to State!")
 
     # Display BOQ results if generated
     if saved_state.get("boq_markdown"):
@@ -170,5 +206,50 @@ if saved_state and saved_state.get("design_concept"):
             label="📥 Download BOQ Material List (.md)",
             data=saved_state["boq_markdown"],
             file_name="boq_material_list.md",
+            mime="text/markdown"
+        )
+
+    # Member 2: Cost Estimator Section
+    if saved_state.get("cost"):
+        cost_info = saved_state["cost"]
+        st.markdown("---")
+        st.markdown('<div class="badge-member">Member 2 — Cost Estimator</div>', unsafe_allow_html=True)
+        st.markdown("### 💰 Project Cost & Budget Estimation")
+        col_c1, col_c2, col_c3 = st.columns(3)
+        with col_c1:
+            st.metric("Estimated Cost", f"Rs. {cost_info.get('estimated_cost', 0):,.0f}")
+        with col_c2:
+            st.metric("Budget", f"Rs. {cost_info.get('budget', 0):,.0f}")
+        with col_c3:
+            rem = cost_info.get("remaining_budget", 0)
+            st.metric("Budget Status", cost_info.get("status", "OK"), delta=f"Rs. {rem:,.0f} remaining")
+
+        if cost_info.get("items"):
+            with st.expander("📊 Itemized Cost Breakdown Table", expanded=False):
+                st.table(cost_info["items"])
+
+    # Member 4: Timeline Agent Section
+    st.markdown("---")
+    st.markdown('<div class="badge-member">Member 4 — Timeline Agent</div>', unsafe_allow_html=True)
+    st.markdown("### 📅 Project Execution Timeline (Kaunsa Kaam Kab Hoga)")
+    st.markdown("Design concept aur cost/scope ke mutabiq complete phase-by-phase execution timeline generate karein.")
+
+    if st.button("⏱️ Generate Project Execution Timeline", key="generate_timeline_btn"):
+        with st.spinner("⚡ Claude/Groq analyzing project scope and creating execution schedule..."):
+            updated_state = timeline_agent(saved_state)
+            st.session_state["interio_os_state"] = updated_state
+            if updated_state.get("error"):
+                st.error(f"❌ {updated_state['error']}")
+            else:
+                st.success(f"✅ Timeline generated via {updated_state.get('timeline_engine', 'AI')}! Estimated Duration: {updated_state.get('estimated_duration', '4 to 5 Weeks')}")
+
+    # Display Timeline results if generated
+    if saved_state.get("timeline_markdown"):
+        st.markdown(f"**⏱️ Estimated Duration:** `{saved_state.get('estimated_duration', '4 to 5 Weeks')}`")
+        st.markdown(saved_state["timeline_markdown"])
+        st.download_button(
+            label="📥 Download Timeline Schedule (.md)",
+            data=saved_state["timeline_markdown"],
+            file_name="project_execution_timeline.md",
             mime="text/markdown"
         )

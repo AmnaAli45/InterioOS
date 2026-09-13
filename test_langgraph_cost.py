@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, cast, Any
 
 from langgraph.graph import (
     StateGraph,
@@ -58,7 +58,7 @@ app = graph.compile()
 # TEST INPUT
 # =========================================================
 
-initial_state = {
+initial_state: ProjectState = {
 
     "requirement":
         "Modern bedroom 12x14 feet",
@@ -107,7 +107,7 @@ initial_state = {
 
 
 # Run LangGraph
-result = app.invoke(
+result: Any = app.invoke(
     initial_state
 )
 

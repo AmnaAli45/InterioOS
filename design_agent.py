@@ -9,7 +9,7 @@ Role & Responsibility:
 """
 
 import os
-from typing import Optional, TypedDict, Dict, Any
+from typing import Optional, TypedDict, Dict, Any, List, cast
 from dotenv import load_dotenv
 from groq import Groq
 from langgraph.graph import StateGraph, END
@@ -35,9 +35,13 @@ class InterioOSState(TypedDict, total=False):
     model: Optional[str]           # Model name used
     design_concept: Optional[str]  # Generated design concept (Member 1 Output)
     boq_markdown: Optional[str]    # Generated BOQ / Material list in Markdown (Member 3 Output)
-    items: Optional[list]          # Structured items list for downstream cost estimation (Member 3 Output)
+    items: Optional[List[Dict[str, Any]]] # Structured items list for downstream cost estimation (Member 3 Output)
     boq_status: Optional[str]      # BOQ status ('completed', 'failed')
     cost: Optional[Dict[str, Any]] # Cost calculation breakdown (Member 2 Output)
+    timeline_markdown: Optional[str] # Project execution schedule in Markdown (Member 4 Output)
+    estimated_duration: Optional[str] # Total project duration (e.g. '4-5 Weeks', '30 Days')
+    timeline_status: Optional[str] # Timeline status ('completed', 'failed')
+    timeline_engine: Optional[str] # LLM engine used for timeline
     status: Optional[str]          # Overall workflow status
     error: Optional[str]           # Error message if any
 
@@ -108,7 +112,8 @@ def design_agent_node(state: InterioOSState) -> InterioOSState:
             max_tokens=2500,
         )
 
-        concept_text = chat_completion.choices[0].message.content.strip()
+        raw_content = chat_completion.choices[0].message.content or ""
+        concept_text = raw_content.strip()
 
         # Save response into LangGraph state
         return {
@@ -181,7 +186,7 @@ def generate_design_concept(
     }
 
     # Execute LangGraph workflow
-    final_state: InterioOSState = design_graph.invoke(initial_state)
+    final_state: InterioOSState = cast(InterioOSState, design_graph.invoke(initial_state))
     return final_state
 
 
@@ -190,7 +195,7 @@ if __name__ == "__main__":
     test_req = "Design a modern bedroom for a client within a budget of Rs. 8 lakh."
     res = generate_design_concept(test_req, budget="Rs. 8 Lakh")
     if res.get("error"):
-        print(f"[ERROR] {res['error']}")
+        print(f"[ERROR] {res.get('error')}")
     else:
         print("=== Design Concept Saved in State (Generated in < 2 seconds!) ===")
-        print(res["design_concept"][:300] + "...\n[Success!]")
+        print((res.get("design_concept") or "")[:300] + "...\n[Success!]")

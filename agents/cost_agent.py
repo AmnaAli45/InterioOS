@@ -1,5 +1,7 @@
 import csv
 import os
+import re
+from typing import Any
 
 from dotenv import load_dotenv
 from groq import Groq
@@ -7,6 +9,21 @@ from groq import Groq
 
 # Load environment variables
 load_dotenv()
+
+
+def parse_budget_value(budget_val: Any) -> float:
+    """Safely converts int, float, or formatted strings ('Rs. 8 Lakh', '800000') into float."""
+    if isinstance(budget_val, (int, float)):
+        return float(budget_val)
+    if isinstance(budget_val, str):
+        val_str = budget_val.lower().replace(",", "").strip()
+        lakh_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)", val_str)
+        if lakh_match:
+            return float(lakh_match.group(1)) * 100000.0
+        num_match = re.search(r"(\d+(?:\.\d+)?)", val_str)
+        if num_match:
+            return float(num_match.group(1))
+    return 0.0
 
 
 # =========================================================
@@ -98,7 +115,8 @@ def calculate_total(items, prices):
 
 def check_budget(budget, estimated_cost):
 
-    difference = budget - estimated_cost
+    numeric_budget = parse_budget_value(budget)
+    difference = numeric_budget - estimated_cost
 
     if difference >= 0:
 
@@ -109,7 +127,7 @@ def check_budget(budget, estimated_cost):
         status = "Over Budget"
 
     return {
-        "budget": budget,
+        "budget": numeric_budget,
         "estimated_cost": estimated_cost,
         "remaining": difference,
         "status": status
@@ -126,7 +144,8 @@ def track_actual_budget(
     actual_cost
 ):
 
-    remaining_budget = budget - actual_cost
+    numeric_budget = parse_budget_value(budget)
+    remaining_budget = numeric_budget - actual_cost
 
     estimated_difference = estimated_cost - actual_cost
 
@@ -140,7 +159,7 @@ def track_actual_budget(
 
     return {
 
-        "budget": budget,
+        "budget": numeric_budget,
 
         "estimated_cost": estimated_cost,
 
@@ -192,20 +211,20 @@ def ask_groq(requirement):
         temperature=0.2
     )
 
-    return response.choices[0].message.content
+    return (response.choices[0].message.content or "").strip()
 
 
 # =========================================================
 # 7. MAIN COST AGENT
 # =========================================================
 
-def cost_agent(state):
+def cost_agent(state: Any) -> Any:
 
     prices = load_prices()
 
     items = state.get("items", [])
 
-    budget = state.get("budget", 0)
+    budget = parse_budget_value(state.get("budget", 0))
 
     requirement = state.get(
         "requirement",
